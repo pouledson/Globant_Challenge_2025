@@ -3,7 +3,6 @@ from flask_restful import Resource,Api, reqparse
 from google.cloud import bigquery,storage
 from google.oauth2 import service_account
 import io
-from datetime import date
 import fastavro
 import credentials
 import logging
@@ -160,8 +159,7 @@ class Requerimiento2(Resource):
        
 class Backup(Resource):
     def schemas_table(self,name):
-        logging.info("MIRA esto")
-        logging.info(name)
+        
 
         if name=="departments":
             schema = {
@@ -206,11 +204,12 @@ class Backup(Resource):
     
     
     def post(self):
-        today = date.today()
-        day = today.strftime("%d%m%Y")
+       
+        
 
         parser = reqparse.RequestParser()          
         parser.add_argument('table',type=str, required=True,location='args')
+        parser.add_argument('name_file',type=str, required=True,location='args')
         args = parser.parse_args()  
         table_id="proyecto."+str(args['table'])
         query = f"SELECT * FROM {table_id}"
@@ -224,11 +223,11 @@ class Backup(Resource):
         for row in results:
             record = {field['name']: row[field['name']] for field in schema['fields']}
             records.append(record)
-        logging.info(records)
+        
         if schema is None:
             return "Esquema no encontrado para la tabla {}".format(args['table'])
         try:   
-            blob_name = f"backups_gb/{args['table']}_{day}.avro" 
+            blob_name = f"backups_gb/{args['name_file']}.avro" 
             fastavro.writer(bytes_writer, schema,records) 
             
             
@@ -249,7 +248,6 @@ class Backup(Resource):
 
 class Restore(Resource):
     def post(self):
-        today = date.today()
         parser = reqparse.RequestParser()          
         parser.add_argument('name_file',type=str, required=True,location='args')
         parser.add_argument('table',type=str, required=True,location='args')
