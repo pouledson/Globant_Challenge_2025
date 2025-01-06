@@ -27,11 +27,12 @@ Las consultas se realizan a traves de un contenedor deployado en Cloud RUN de gc
     
  ### Create a feature to backup for each table and save it in the file system in AVRO format:
  
-    Request: https://globant-challenge-425423236751.us-central1.run.app/Backup?table=jobs
+    Request: https://globant-challenge-425423236751.us-central1.run.app/Backup?table=departments&name_file=prueba1
     Backup es el Endpoint.  
-        -   table: Es el argumento que recibe el nombre de la tabla de la que se obtendrá el backup ( en el ejemplo jobs, pero puede ser cualquiera de las tres tablas). 
+        -   table: Es el argumento que recibe el nombre de la tabla de la que se obtendrá el backup ( en el ejemplo departments, pero puede ser cualquiera de las tres tablas). 
+        -   name_file: Nombre que tendrá el archivo avro al hacerse el backup 
     El resultado de esta consulta será el mensaje: "Se obtuvo AVRO de tabla ... y se copió archivo a Cloud Storage de manera correcta".
-    Al ejecutar la request se inserta en un bucket un archivo avro con el formato nombredetabla_fechaactual.avro (fechaactual tiene el formato ddmmyyyy)
+    Al ejecutar la request se inserta en un bucket un archivo avro con el nombre proporcionado en name_file
 
 ### Create a feature to restore a certain table with its backup:  
 
@@ -177,14 +178,14 @@ def schemas_table(self,name):
 ...
 ```
 
-Se obtienen el valor del argumento "table" y se obtiene los datos de la tabla con ese nombre:
+Se obtienen el valor del argumento "table" y "name_file"
 ```python 
 def post(self):
-        today = date.today()
-        day = today.strftime("%d%m%Y")
+        
 
         parser = reqparse.RequestParser()          
         parser.add_argument('table',type=str, required=True,location='args')
+        parser.add_argument('name_file',type=str, required=True,location='args')
         args = parser.parse_args()  
         table_id="proyecto."+str(args['table'])
         query = f"SELECT * FROM {table_id}"
@@ -206,7 +207,7 @@ Detecta si el esquema es el correcto y genera archivo AVRO
         if schema is None:
             return "Esquema no encontrado para la tabla {}".format(args['table'])
         try:   
-            blob_name = f"backups_gb/{args['table']}_{day}.avro" 
+            blob_name = f"backups_gb/{args['name_file']}.avro"  
             fastavro.writer(bytes_writer, schema,records) 
             
             
