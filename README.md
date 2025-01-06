@@ -12,29 +12,30 @@ Cada una de ellas tiene la estructura de los csv.
 
 ## Cómo realizar las consultas
 
-Las consultas se realizan a traves de un contender deployado en Cloud RUN de gcp
+Las consultas se realizan a traves de un contenedor deployado en Cloud RUN de GCP (todas las pruebas se realizaron con POSTMAN)
 
 ## Challenge 1: 
-## Create a Rest API service to receive new data:
-
+### Create a Rest API service to receive new data:
+    Método: POST
     Request: https://globant-challenge-425423236751.us-central1.run.app/Insertbatch?table=jobs
     Insertbatch es el Endpoint.  
         -   table: Es el argumento que recibe el nombre de la tabla en donde se insertarán los datos ( en el ejemplo jobs, pero puede ser cualquiera de las tres tablas).  
-        -   file: es el argumento que recibe el archivo csv que se insertará en bloque a la tabla referenciada en el parámetro table.  
+        -   file: es el argumento que recibe el archivo csv que se insertará en bloque a la tabla referenciada en el parámetro table.  ( se adjunta el archivo por POSTMAN)
     
     El resultado de esta consulta será el mensaje de inserción correcta: "Se insertaron los valores correctamente en la tabla ..."
     Al ejecutar el request se insertan en la "tabla" el contenido del archivo "file". Para las pruebas he usado postman:
     
- ## Create a feature to backup for each table and save it in the file system in AVRO format:
- 
-    Request: https://globant-challenge-425423236751.us-central1.run.app/Backup?table=jobs
+ ### Create a feature to backup for each table and save it in the file system in AVRO format:
+    Método: POST
+    Request: https://globant-challenge-425423236751.us-central1.run.app/Backup?table=departments&name_file=prueba1
     Backup es el Endpoint.  
-        -   table: Es el argumento que recibe el nombre de la tabla de la que se obtendrá el backup ( en el ejemplo jobs, pero puede ser cualquiera de las tres tablas). 
+        -   table: Es el argumento que recibe el nombre de la tabla de la que se obtendrá el backup ( en el ejemplo departments, pero puede ser cualquiera de las tres tablas). 
+        -   name_file: Nombre que tendrá el archivo avro al hacerse el backup 
     El resultado de esta consulta será el mensaje: "Se obtuvo AVRO de tabla ... y se copió archivo a Cloud Storage de manera correcta".
-    Al ejecutar la request se inserta en un bucket un archivo avro con el formato nombredetabla_fechaactual.avro (fechaactual tiene el formato ddmmyyyy)
+    Al ejecutar la request se inserta en un bucket un archivo avro con el nombre proporcionado en name_file
 
-## Create a feature to restore a certain table with its backup:  
-
+### Create a feature to restore a certain table with its backup:  
+    Método: POST
     Request: https://globant-challenge-425423236751.us-central1.run.app/Restore?name_file=nombredetabla_fechaactual&table=jobs
     Backup es el Endpoint.  
         -   table: Es el argumento que recibe el nombre de la tabla que se restaurará ( en el ejemplo jobs, pero puede ser cualquiera de las tres tablas). 
@@ -43,11 +44,12 @@ Las consultas se realizan a traves de un contender deployado en Cloud RUN de gcp
     
 ## Challenge 2:
   
-## Primera consulta:
+### Primera consulta:
+    Método: GET
     Request: https://globant-challenge-425423236751.us-central1.run.app/Requerimiento1
     La consulta tendrá como salida el resultado de la query que resuelve el primer requerimiento. Esta salida estará en formato JSON
-## Segunda consulta:
- 
+### Segunda consulta:
+    Método: GET
     Request: https://globant-challenge-425423236751.us-central1.run.app/Requerimiento2
     La consulta tendrá como salida el resultado de la query que resuelve el segundo requerimiento. Esta salida estará en formato JSON
 
@@ -177,14 +179,14 @@ def schemas_table(self,name):
 ...
 ```
 
-Se obtienen el valor del argumento "table" y se obtiene los datos de la tabla con ese nombre:
+Se obtienen el valor del argumento "table" y "name_file"
 ```python 
 def post(self):
-        today = date.today()
-        day = today.strftime("%d%m%Y")
+        
 
         parser = reqparse.RequestParser()          
         parser.add_argument('table',type=str, required=True,location='args')
+        parser.add_argument('name_file',type=str, required=True,location='args')
         args = parser.parse_args()  
         table_id="proyecto."+str(args['table'])
         query = f"SELECT * FROM {table_id}"
@@ -206,7 +208,7 @@ Detecta si el esquema es el correcto y genera archivo AVRO
         if schema is None:
             return "Esquema no encontrado para la tabla {}".format(args['table'])
         try:   
-            blob_name = f"backups_gb/{args['table']}_{day}.avro" 
+            blob_name = f"backups_gb/{args['name_file']}.avro"  
             fastavro.writer(bytes_writer, schema,records) 
             
             
