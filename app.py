@@ -127,6 +127,7 @@ class Requerimiento2(Resource):
                         inner join
                         proyecto.departments b
                         on a.department_id=b.id
+                        where extract(year from date(a.datetime)) =2021
                         group by
                         a.department_id,
                         b.department  ,
