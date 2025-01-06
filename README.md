@@ -1,13 +1,6 @@
 # Globant’s Data Engineering Coding Challenge
-## Instalación
+## API Request
 
-Para hacer el deploy del paquete:
-- Clonar el repositorio
-- Ejecutar: docker build  -t globant_challenge .
-- docker run  -d -p 5000:5000 globant_challenge
-
-Esto permitirá hacer las consultar post y get a través de la http://127.0.0.1:5000.
-Las pruebas las he realizado con Postman
 
 ## Base de datos 
 Se utiliza Bigquery como base de datos, en ella se pueden encontrar 3 tablas:
@@ -19,34 +12,59 @@ Cada una de ellas tiene la estructura de los csv.
 
 ## Cómo realizar las consultas
 
-Sectión 1: Ejemplo de consulta
-- http://127.0.0.1:5000/Insertbatch?table=jobs
+Las consultas se realizan a traves de un contender deployado en Cloud RUN de gcp
+
+### Challenge 1: 
+#### Create a Rest API service to receive new data:
+    Request: https://globant-challenge-425423236751.us-central1.run.app/Insertbatch?table=jobs
     Insertbatch es el Endpoint.  
-        -   table: Es el argumento que recibe el nombre de la tabla en donde se insertarán los datos.  
+        -   table: Es el argumento que recibe el nombre de la tabla en donde se insertarán los datos ( en el ejemplo jobs, pero puede ser cualquiera de las tres tablas).  
         -   file: es el argumento que recibe el archivo csv que se insertará en bloque a la tabla referenciada en el parámetro table.  
     
     El resultado de esta consulta será el mensaje de inserción correcta: "Se insertaron los valores correctamente en la tabla ..."
+    Al ejecutar el request se insertan en la "tabla" el contenido del archivo "file". Para las pruebas he usado postman:
+    
+ #### Create a feature to backup for each table and save it in the file system in AVRO format:   
+    Request: https://globant-challenge-425423236751.us-central1.run.app/Backup?table=jobs
+    Backup es el Endpoint.  
+        -   table: Es el argumento que recibe el nombre de la tabla de la que se obtendrá el backup ( en el ejemplo jobs, pero puede ser cualquiera de las tres tablas). 
+    El resultado de esta consulta será el mensaje: "Se obtuvo AVRO de tabla ... y se copió archivo a Cloud Storage de manera correcta".
+    Al ejecutar la request se inserta en un bucket un archivo avro con el formato nombredetabla_fechaactual.avro (fechaactual tiene el formato ddmmyyyy)
 
-Sección 2:
-Primer requerimiento
-- http://127.0.0.1:5000/Requerimiento1
+#### Create a feature to restore a certain table with its backup:   
+    Request: https://globant-challenge-425423236751.us-central1.run.app/Restore?name_file=nombredetabla_fechaactual&table=jobs
+    Backup es el Endpoint.  
+        -   table: Es el argumento que recibe el nombre de la tabla que se restaurará ( en el ejemplo jobs, pero puede ser cualquiera de las tres tablas). 
+        -   name_file: Nombre del archivo AVRO
+    El resultado de esta consulta será el mensaje: "Se obtuvo AVRO de tabla ... y se copió archivo a Cloud Storage de manera correcta".
+    
+### Challenge 2:
+  
+#### Primera consulta:
+    Request: https://globant-challenge-425423236751.us-central1.run.app/Requerimiento1
     La consulta tendrá como salida el resultado de la query que resuelve el primer requerimiento. Esta salida estará en formato JSON
-Segundo requerimiento 
-- http://127.0.0.1:5000/Requerimiento2
+#### Segunda consulta:
+ 
+    Request: https://globant-challenge-425423236751.us-central1.run.app/Requerimiento2
     La consulta tendrá como salida el resultado de la query que resuelve el segundo requerimiento. Esta salida estará en formato JSON
 
 
 ## Importación de librerias
-Se importan las librerías:Flask,Pandas,Google,werkzeug.
-Y se llama al archivo credentials.py que contiene la información de credenciales para conexión con GCP (Bigquery)
+Se importan las librerías:Flask,Pandas,Google,werkzeug,fastavro.
+Y se llama al archivo credentials.py que contiene la información de credenciales para conexión con GCP (Bigquery) .
+##El archivo json que contiene las credenciales no se ha subido al git por temas de seguridad, sin embargo esto está en el build del contenedor donde se puede realizar las consultas
+
 ```python
 
-from flask import Flask,request
+from flask import Flask,request,jsonify,make_response
 from flask_restful import Resource,Api, reqparse
-import pandas as pd
-from google.cloud import bigquery
+from google.cloud import bigquery,storage
 from google.oauth2 import service_account
+import io
+from datetime import date
+import fastavro
 import credentials
+import logging
 ```
 ## Importación de credenciales, conexión con API de Bigquery, Flask
 
@@ -66,8 +84,8 @@ Creación del objeto de la APP de Flask y seteo del api
 app = Flask(__name__)
 api = Api(app)
 ```
-## SECCION 1: API
-Hace referencia a la generación del API de la sección 1. Esta clase permitirá la inserción  de data en bigquery, la data a insertar será la contenida en un csv. Se toma como parámetro el nombre de la tabla destino.
+## CLASS Insertbatch:
+Esta clase permitirá la inserción  de data en bigquery, la data a insertar será la contenida en un csv. Se toma como parámetro el nombre de la tabla destino.
 
 ```python
 class Insertbatch(Resource):
@@ -131,8 +149,121 @@ Se envía mensaje de inserción exitosa
             
 
         return mensaje
-```   
-## SECCION 2: Primer Requerimiento
+```
+
+## CLASS Backup:
+Esta clase obtiene un backup de la tabla especificada y genera automáticamente un archivo AVRO (con el nombre de la tabla y la fecha actual)
+
+Se definen los esquemas que deben contener los archivos AVRO (misma estructura que las tablas)
+
+```python
+def schemas_table(self,name):
+        
+
+        if name=="departments":
+            schema = {
+                "namespace": "com.schema.data",
+                "type": "record",
+                "name": name    ,
+                "fields": [
+                    {"name": "id", "type": "int"},
+                    {"name": "department", "type": "string"}
+              
+                ]
+            }
+...
+```
+
+Se obtienen el valor del argumento "table" y se obtiene los datos de la tabla con ese nombre:
+```python 
+def post(self):
+        today = date.today()
+        day = today.strftime("%d%m%Y")
+
+        parser = reqparse.RequestParser()          
+        parser.add_argument('table',type=str, required=True,location='args')
+        args = parser.parse_args()  
+        table_id="proyecto."+str(args['table'])
+        query = f"SELECT * FROM {table_id}"
+        query_job = client.query(query)  
+        results = query_job.result() 
+```
+
+Detecta si el esquema es el correcto y genera archivo AVRO
+```python
+
+        bytes_writer = io.BytesIO()
+        
+        schema=self.schemas_table(str(args['table']))
+        records = []
+        for row in results:
+            record = {field['name']: row[field['name']] for field in schema['fields']}
+            records.append(record)
+        
+        if schema is None:
+            return "Esquema no encontrado para la tabla {}".format(args['table'])
+        try:   
+            blob_name = f"backups_gb/{args['table']}_{day}.avro" 
+            fastavro.writer(bytes_writer, schema,records) 
+            
+            
+            bucket_name = "proyectoglobant2905"
+            
+            bucket = storage_client.bucket(bucket_name)
+            blob = bucket.blob(blob_name)
+            blob.upload_from_string(bytes_writer.getvalue(), content_type='application/octet-stream')
+            mensaje=    "Se obtuvo AVRO de tabla {} y se copió archivo a Cloud Storage de manera correcta".format(
+                        table_id
+                    )
+                
+                
+
+            return mensaje    
+        except Exception as e:
+            return f"Error al escribir el archivo Avro: {str(e)}"
+
+
+```
+
+## CLASS Restore:
+Esta clase restaura una tabla especificada a partir del nombre de un archivo:
+
+```python
+def post(self):
+        today = date.today()
+        parser = reqparse.RequestParser()          
+        parser.add_argument('name_file',type=str, required=True,location='args')
+        parser.add_argument('table',type=str, required=True,location='args')
+        args = parser.parse_args()  
+        table_id="proyectoglobant2905.proyecto."+str(args['table'])
+        bucket_name = "proyectoglobant2905"
+        blob_name =  f"backups_gb/{args['name_file']}.avro"  
+        
+        job_config = bigquery.LoadJobConfig(
+            source_format=bigquery.SourceFormat.AVRO,
+            autodetect=True, 
+            write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE 
+        )   
+        # Start the load job
+        uri = f"gs://{bucket_name}/{blob_name}"
+        load_job = client.load_table_from_uri(uri, table_id, job_config=job_config)
+
+        # Wait for the job to complete
+        load_job.result()
+        mensaje=    "Se restauró la tabla {} ".format(
+                     table_id
+                )
+             
+            
+
+        return mensaje   
+
+
+```
+
+
+
+## CLASS: Requerimiento1
 Hace referencia al primer requerimiento de la Sección 2. End Point --> Requerimiento1
 ```python
 class Requerimiento1(Resource):
@@ -199,7 +330,7 @@ Se utiliza to_dataframe() para la conversión del resultado de la query en un da
  ```  
   
 
-## SECCION 2: Segundo Requerimiento
+## CLASS: Requerimiento2
 Hace referencia al segundo requerimiento de la Sección 2. End Point --> Requerimiento2
 
 ```python 
