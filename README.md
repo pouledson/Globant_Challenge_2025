@@ -12,11 +12,11 @@ Cada una de ellas tiene la estructura de los csv.
 
 ## Cómo realizar las consultas
 
-Las consultas se realizan a traves de un contenedor deployado en Cloud RUN de gcp
+Las consultas se realizan a traves de un contenedor deployado en Cloud RUN de GCP (todas las pruebas se realizaron con POSTMAN)
 
 ## Challenge 1: 
 ### Create a Rest API service to receive new data:
-
+    Método: POST
     Request: https://globant-challenge-425423236751.us-central1.run.app/Insertbatch?table=jobs
     Insertbatch es el Endpoint.  
         -   table: Es el argumento que recibe el nombre de la tabla en donde se insertarán los datos ( en el ejemplo jobs, pero puede ser cualquiera de las tres tablas).  
@@ -26,7 +26,7 @@ Las consultas se realizan a traves de un contenedor deployado en Cloud RUN de gc
     Al ejecutar el request se insertan en la "tabla" el contenido del archivo "file". Para las pruebas he usado postman:
     
  ### Create a feature to backup for each table and save it in the file system in AVRO format:
- 
+    Método: POST
     Request: https://globant-challenge-425423236751.us-central1.run.app/Backup?table=departments&name_file=prueba1
     Backup es el Endpoint.  
         -   table: Es el argumento que recibe el nombre de la tabla de la que se obtendrá el backup ( en el ejemplo departments, pero puede ser cualquiera de las tres tablas). 
@@ -35,7 +35,7 @@ Las consultas se realizan a traves de un contenedor deployado en Cloud RUN de gc
     Al ejecutar la request se inserta en un bucket un archivo avro con el nombre proporcionado en name_file
 
 ### Create a feature to restore a certain table with its backup:  
-
+    Método: POST
     Request: https://globant-challenge-425423236751.us-central1.run.app/Restore?name_file=nombredetabla_fechaactual&table=jobs
     Backup es el Endpoint.  
         -   table: Es el argumento que recibe el nombre de la tabla que se restaurará ( en el ejemplo jobs, pero puede ser cualquiera de las tres tablas). 
@@ -45,10 +45,11 @@ Las consultas se realizan a traves de un contenedor deployado en Cloud RUN de gc
 ## Challenge 2:
   
 ### Primera consulta:
+    Método: GET
     Request: https://globant-challenge-425423236751.us-central1.run.app/Requerimiento1
     La consulta tendrá como salida el resultado de la query que resuelve el primer requerimiento. Esta salida estará en formato JSON
 ### Segunda consulta:
- 
+    Método: GET
     Request: https://globant-challenge-425423236751.us-central1.run.app/Requerimiento2
     La consulta tendrá como salida el resultado de la query que resuelve el segundo requerimiento. Esta salida estará en formato JSON
 
