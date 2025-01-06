@@ -400,6 +400,11 @@ api.add_resource(Requerimiento1, '/Requerimiento1')
 api.add_resource(Requerimiento2, '/Requerimiento2')   
 api.add_resource(Insertbatch, '/Insertbatch')  
 
+
+#POWERBI
+
+Se encontrará el archivo globant_challenge.pbix que contiene un pequeño reporte que se alimenta de datos que obtiene a partir de la consulta del api.
+
  
     
 ```
