@@ -1,148 +1,66 @@
-# Globant’s Data Engineering Coding Challenge
-## Instalación
-
-Para hacer el deploy del paquete:
-- Clonar el repositorio
-- Ejecutar: docker build  -t globant_challenge .
-- docker run  -d -p 5000:5000 globant_challenge
-
-Esto permitirá hacer las consultar post y get a través de la http://127.0.0.1:5000.
-Las pruebas las he realizado con Postman
-
-## Base de datos 
-Se utiliza Bigquery como base de datos, en ella se pueden encontrar 3 tablas:
-    - jobs
-    - departments
-    - hired_employees
-Cada una de ellas tiene la estructura de los csv.
-
-
-## Cómo realizar las consultas
-
-Sectión 1: Ejemplo de consulta
-- http://127.0.0.1:5000/Insertbatch?table=jobs
-    Insertbatch es el Endpoint.  
-        -   table: Es el argumento que recibe el nombre de la tabla en donde se insertarán los datos.  
-        -   file: es el argumento que recibe el archivo csv que se insertará en bloque a la tabla referenciada en el parámetro table.  
-    
-    El resultado de esta consulta será el mensaje de inserción correcta: "Se insertaron los valores correctamente en la tabla ..."
-
-Sección 2:
-Primer requerimiento
-- http://127.0.0.1:5000/Requerimiento1
-    La consulta tendrá como salida el resultado de la query que resuelve el primer requerimiento. Esta salida estará en formato JSON
-Segundo requerimiento 
-- http://127.0.0.1:5000/Requerimiento2
-    La consulta tendrá como salida el resultado de la query que resuelve el segundo requerimiento. Esta salida estará en formato JSON
-
-
-## Importación de librerias
-Se importan las librerías:Flask,Pandas,Google,werkzeug.
-Y se llama al archivo credentials.py que contiene la información de credenciales para conexión con GCP (Bigquery)
-```python
-
-from flask import Flask,request
+from flask import Flask,request,jsonify,make_response
 from flask_restful import Resource,Api, reqparse
-import pandas as pd
-from google.cloud import bigquery
+from google.cloud import bigquery,storage
 from google.oauth2 import service_account
+import io
+from datetime import date
+import fastavro
 import credentials
-```
-## Importación de credenciales, conexión con API de Bigquery, Flask
-
-A partir del archivo de service account se genera las credenciales que permitirá interactuar con la API de Bigquery (Bigquery.Client)
-
-```python
-
+import logging
+logging.basicConfig(filename='app.log', level=logging.DEBUG)
 credentials = service_account.Credentials.from_service_account_file(
     credentials.path_to_service_account_key_file, scopes=["https://www.googleapis.com/auth/cloud-platform"],
 )
  
 client = bigquery.Client(credentials=credentials, project=credentials.project_id,)
-```
 
-Creación del objeto de la APP de Flask y seteo del api
-```python
+storage_client = storage.Client(credentials=credentials)
+
+
 app = Flask(__name__)
 api = Api(app)
-```
-## SECCION 1: API
-Hace referencia a la generación del API de la sección 1. Esta clase permitirá la inserción  de data en bigquery, la data a insertar será la contenida en un csv. Se toma como parámetro el nombre de la tabla destino.
 
-```python
 class Insertbatch(Resource):
-```    
-Método archivo_permitido permite identificar si el archivo a enviar es de extensión CSV
-```python
+    
     def archivo_permitido(self, filename):
         ALLOWED_EXTENSIONS = {'csv'}
         return '.' in filename and \
             filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-```
-Método Post
-```python
     def post(self):
-```
-Se setea el argumento que será pasado por el método Post. El argumento a pasar es el nombre de la tabla en donde se realizará la inserción de la data
-```python
         parser = reqparse.RequestParser()          
         parser.add_argument('table',type=str, required=True,location='args')
         args = parser.parse_args()  
-```
-La variable Table_id contiene la información del proyecto mas el dataset y la tabla (la cual se obtiene del argumento mencionado en el punto anterior)
-```python
+
         table_id="proyectoglobant2905.proyecto."+str(args['table'])
-```
-En caso se enviar la consulta y en ella nos e encuentre el archivo, el mensaje será "Archivo no encontrado"
-```python
         if 'file' not in request.files:
             return 'Archivo no encontrado'
-```   
-Se captura  el archivo csv
-```python     
-        file = request.files.get("file")
-
         
-```   
-Se configura la carga del archivo csv a bigquery en modo WRITE_APPEND (se inserta data)
-```python      
-        if file and self.archivo_permitido(file.filename):          
+        file = request.files.get("file")
+        if file and self.archivo_permitido(file.filename):
+            
             job_config = bigquery.LoadJobConfig(
                 source_format=bigquery.SourceFormat.CSV, skip_leading_rows=0, autodetect=False,field_delimiter=",",
                     write_disposition=bigquery.WriteDisposition.WRITE_APPEND
             )
-```
-Se procede con la carga del archivo a bigquery, se toma como parámetro el table_id.
-```python
+
             job = client.load_table_from_file(file.stream, table_id, job_config=job_config)
- ```   
-Se obtiene resultado del job
-```python            
+                
             job.result()  
              
-            client.get_table(table_id) 
-  ```   
-Se envía mensaje de inserción exitosa
-```python          
+            client.get_table(table_id)  
+             
             mensaje=    "Se insertaron los valores correctamente en la tabla  {}".format(
                      table_id
                 )
              
             
 
-        return mensaje
-```   
-## SECCION 2: Primer Requerimiento
-Hace referencia al primer requerimiento de la Sección 2. End Point --> Requerimiento1
-```python
+        return mensaje    
+
 class Requerimiento1(Resource):
-```
-Método get:
-```python     
+
+    
     def get(self):
-```
-Se asigna la query al client para su ejecución en Bigquery
-```python 
         query_job = client.query(
                 """
                 select
@@ -188,27 +106,14 @@ Se asigna la query al client para su ejecución en Bigquery
                 
                 """
             )
-```
-Se utiliza to_dataframe() para la conversión del resultado de la query en un dataframe que luego se convierte a un tipo de dato diccionario para que pueda ser retornado en ese formato al momento de la consulta en el api (método get)
-  
-```python 
         job_result = query_job.to_dataframe()  
-        data = job_result.to_dict() 
-
-        return {'data': data}, 200  
- ```  
-  
-
-## SECCION 2: Segundo Requerimiento
-Hace referencia al segundo requerimiento de la Sección 2. End Point --> Requerimiento2
-
-```python 
- 
+        data = job_result.to_dict(orient='records')  
+        return make_response(jsonify(data), 200)  
+        
+    
 class Requerimiento2(Resource):
-```
-Se asigna la query al client para su ejecución en Bigquery
-```python 
-     
+
+    
     def get(self):
         query_job = client.query(
                 """
@@ -249,25 +154,137 @@ Se asigna la query al client para su ejecución en Bigquery
                 
                 """
             )
-```
-Se utiliza to_dataframe() para la conversión del resultado de la query en un dataframe que luego se convierte a un tipo de dato diccionario para que pueda ser retornado en ese formato al momento de la consulta en el api (método get)
-```python
-        job_result = query_job.to_dataframe()  
-        data = job_result.to_dict()  
-        return {'data': data}, 200  
+        job_result = query_job.to_dataframe() 
+        data = job_result.to_dict(orient='records')  
+        return make_response(jsonify(data), 200)  
        
-```
+class Backup(Resource):
+    def schemas_table(self,name):
+        logging.info("MIRA esto")
+        logging.info(name)
 
-Se añaden los end_points
-```python
+        if name=="departments":
+            schema = {
+                "namespace": "com.schema.data",
+                "type": "record",
+                "name": name    ,
+                "fields": [
+                    {"name": "id", "type": "int"},
+                    {"name": "department", "type": "string"}
+              
+                ]
+            }
+        elif name=="hired_employees":
+            schema = {
+                "namespace": "com.schema.data",
+                "type": "record",
+                "name": name    ,
+                "fields": [
+                    {"name": "id", "type": "int"},
+                    {"name": "name", "type": "string"},
+                    {"name": "datetime", "type": "string"},
+                    {"name": "datetime_id", "type": "int"},
+                    {"name": "job_id", "type": "int"}
+
+              
+                ]
+            }
+        elif name=="jobs":
+            schema = {
+                "namespace": "com.schema.data",
+                "type": "record",
+                "name": name    ,
+                "fields": [
+                    {"name": "id", "type": "int"},
+                    {"name": "job", "type": "string"}
+              
+                ]
+            }
+        else:
+            schema=None
+        return schema
+    
+    
+    def post(self):
+        today = date.today()
+        day = today.strftime("%d%m%Y")
+
+        parser = reqparse.RequestParser()          
+        parser.add_argument('table',type=str, required=True,location='args')
+        args = parser.parse_args()  
+        table_id="proyecto."+str(args['table'])
+        query = f"SELECT * FROM {table_id}"
+        query_job = client.query(query)  
+        results = query_job.result() 
+        
+        bytes_writer = io.BytesIO()
+        
+        schema=self.schemas_table(str(args['table']))
+        records = []
+        for row in results:
+            record = {field['name']: row[field['name']] for field in schema['fields']}
+            records.append(record)
+        logging.info(records)
+        if schema is None:
+            return "Esquema no encontrado para la tabla {}".format(args['table'])
+        try:   
+            blob_name = f"backups_gb/{args['table']}_{day}.avro" 
+            fastavro.writer(bytes_writer, schema,records) 
+            
+            
+            bucket_name = "proyectoglobant2905"
+            
+            bucket = storage_client.bucket(bucket_name)
+            blob = bucket.blob(blob_name)
+            blob.upload_from_string(bytes_writer.getvalue(), content_type='application/octet-stream')
+            mensaje=    "Se obtuvo AVRO de tabla {} y se copió archivo a Cloud Storage de manera correcta".format(
+                        table_id
+                    )
+                
+                
+
+            return mensaje    
+        except Exception as e:
+            return f"Error al escribir el archivo Avro: {str(e)}"
+
+class Restore(Resource):
+    def post(self):
+        today = date.today()
+        parser = reqparse.RequestParser()          
+        parser.add_argument('name_file',type=str, required=True,location='args')
+        parser.add_argument('table',type=str, required=True,location='args')
+        args = parser.parse_args()  
+        table_id="proyectoglobant2905.proyecto."+str(args['table'])
+        bucket_name = "proyectoglobant2905"
+        blob_name =  f"backups_gb/{args['name_file']}.avro"  
+        
+        job_config = bigquery.LoadJobConfig(
+            source_format=bigquery.SourceFormat.AVRO,
+            autodetect=True, 
+            write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE 
+        )   
+        # Start the load job
+        uri = f"gs://{bucket_name}/{blob_name}"
+        load_job = client.load_table_from_uri(uri, table_id, job_config=job_config)
+
+        # Wait for the job to complete
+        load_job.result()
+        mensaje=    "Se restauró la tabla {} ".format(
+                     table_id
+                )
+             
+            
+
+        return mensaje   
+
+
 api.add_resource(Requerimiento1, '/Requerimiento1')   
 api.add_resource(Requerimiento2, '/Requerimiento2')   
 api.add_resource(Insertbatch, '/Insertbatch')  
-
- 
+api.add_resource(Backup, '/Backup')  
+api.add_resource(Restore, '/Restore')  
     
-```
-```python
+
+
 if __name__ == '__main__':
     app.run(debug=True)  
-```
