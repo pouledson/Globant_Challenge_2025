@@ -20,7 +20,7 @@ Las consultas se realizan a traves de un contenedor deployado en Cloud RUN de GC
     Request: https://globant-challenge-425423236751.us-central1.run.app/Insertbatch?table=jobs
     Insertbatch es el Endpoint.  
         -   table: Es el argumento que recibe el nombre de la tabla en donde se insertarán los datos ( en el ejemplo jobs, pero puede ser cualquiera de las tres tablas).  
-        -   file: es el argumento que recibe el archivo csv que se insertará en bloque a la tabla referenciada en el parámetro table.  
+        -   file: es el argumento que recibe el archivo csv que se insertará en bloque a la tabla referenciada en el parámetro table.  ( se adjunta el archivo por POSTMAN)
     
     El resultado de esta consulta será el mensaje de inserción correcta: "Se insertaron los valores correctamente en la tabla ..."
     Al ejecutar el request se insertan en la "tabla" el contenido del archivo "file". Para las pruebas he usado postman:
