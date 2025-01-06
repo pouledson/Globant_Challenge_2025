@@ -9,6 +9,9 @@ Se utiliza Bigquery como base de datos, en ella se pueden encontrar 3 tablas:
     - hired_employees
 Cada una de ellas tiene la estructura de los csv.
 
+## Implementación en la nube:
+
+El Api se ejecuta desde un repositorio docker deployado en Cloud Run de GCP. 
 
 ## Cómo realizar las consultas
 
