@@ -16,6 +16,7 @@ Las consultas se realizan a traves de un contender deployado en Cloud RUN de gcp
 
 ## Challenge 1: 
 ## Create a Rest API service to receive new data:
+
     Request: https://globant-challenge-425423236751.us-central1.run.app/Insertbatch?table=jobs
     Insertbatch es el Endpoint.  
         -   table: Es el argumento que recibe el nombre de la tabla en donde se insertarán los datos ( en el ejemplo jobs, pero puede ser cualquiera de las tres tablas).  
@@ -24,14 +25,16 @@ Las consultas se realizan a traves de un contender deployado en Cloud RUN de gcp
     El resultado de esta consulta será el mensaje de inserción correcta: "Se insertaron los valores correctamente en la tabla ..."
     Al ejecutar el request se insertan en la "tabla" el contenido del archivo "file". Para las pruebas he usado postman:
     
- ## Create a feature to backup for each table and save it in the file system in AVRO format:   
+ ## Create a feature to backup for each table and save it in the file system in AVRO format:
+ 
     Request: https://globant-challenge-425423236751.us-central1.run.app/Backup?table=jobs
     Backup es el Endpoint.  
         -   table: Es el argumento que recibe el nombre de la tabla de la que se obtendrá el backup ( en el ejemplo jobs, pero puede ser cualquiera de las tres tablas). 
     El resultado de esta consulta será el mensaje: "Se obtuvo AVRO de tabla ... y se copió archivo a Cloud Storage de manera correcta".
     Al ejecutar la request se inserta en un bucket un archivo avro con el formato nombredetabla_fechaactual.avro (fechaactual tiene el formato ddmmyyyy)
 
-## Create a feature to restore a certain table with its backup:   
+## Create a feature to restore a certain table with its backup:  
+
     Request: https://globant-challenge-425423236751.us-central1.run.app/Restore?name_file=nombredetabla_fechaactual&table=jobs
     Backup es el Endpoint.  
         -   table: Es el argumento que recibe el nombre de la tabla que se restaurará ( en el ejemplo jobs, pero puede ser cualquiera de las tres tablas). 
